@@ -248,5 +248,11 @@ func createStaticBackendFile(tp *entity.ThePackage) {
       outputFile := fmt.Sprintf("go.mod")
       basic(tp, templateFile, outputFile, tp, 0664)
     }
+
+    {
+      templateFile, _ := templates.Templates.ReadFile("backend/webapp/webapp._go")
+      outputFile := fmt.Sprintf("webapp/webapp.go")
+      basic(tp, templateFile, outputFile, tp, 0664)
+    }
   }
 }
