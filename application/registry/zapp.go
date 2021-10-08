@@ -3,7 +3,6 @@ package registry
 import (
 	"context"
 	"flag"
-	"fmt"
 	"github.com/mirzaakhena/zapp2/application"
 	"github.com/mirzaakhena/zapp2/controller/cmd"
 	"github.com/mirzaakhena/zapp2/gateway/local"
@@ -19,22 +18,20 @@ type zapp struct {
 
 func (r *zapp) RunApplication() {
 
-	fmt.Println("hello")
-
 	flag.Parse()
 	cmd := flag.Arg(0)
 
 	if cmd == "" {
-		log.Error(context.Background(), "zapp backend/frontend")
+		log.Error(context.Background(), "zapp script.yaml")
 		return
 	}
 
 	var values = make([]string, 0)
-	if flag.NArg() > 1 {
-		values = flag.Args()[1:]
+	if flag.NArg() > 0 {
+		values = flag.Args()[0:]
 	}
 
-	f, exists := r.CommandMap[cmd]
+	f, exists := r.CommandMap["endtoend"]
 	if !exists {
 		log.Error(context.Background(), "Command %s is not recognized", cmd)
 		return

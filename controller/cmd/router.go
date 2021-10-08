@@ -11,5 +11,5 @@ type Controller struct {
 
 // RegisterRouter registering all the router
 func (r *Controller) RegisterRouter() {
-	r.CommandMap["frontend"] = r.generateEndToEndHandler(r.GenerateEndToEndInport)
+	r.CommandMap["endtoend"] = r.generateEndToEndHandler(r.GenerateEndToEndInport)
 }

@@ -1,7 +1,6 @@
 package service
 
 import (
-  "fmt"
   "github.com/mirzaakhena/zapp2/domain/entity"
   "log"
   "os"
@@ -13,7 +12,7 @@ import (
 
 func basic(pkg *entity.ThePackage, templateFile []byte, outputFilePath string, object interface{}, perm os.FileMode) {
 
-  fmt.Println(outputFilePath)
+  //fmt.Println(outputFilePath)
 
   //var buffer bytes.Buffer
 

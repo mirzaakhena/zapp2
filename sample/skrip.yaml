@@ -1,0 +1,36 @@
+packagePath: github.com/mirzaakhena/demo2
+
+entities:
+
+- name: UserPoint
+  fields:
+  - name: UserID
+    dataType: string
+  - name: Point
+    dataType: int
+  - name: PointBalance
+    dataType: int
+  - name: EventState
+    dataType: enum
+    enumReference: EventStateEnum
+
+- name: UserPointExpired
+  fields:
+  - name: UserID
+    dataType: string
+  - name: TotalPoint
+    dataType: int
+  - name: StartPeriod
+    dataType: time.Time
+  - name: EndPeriod
+    dataType: time.Time
+  - name: ExpiryDate
+    dataType: time.Time        
+
+enums:
+- name: EventStateEnum
+  values:
+  - text: REGISTER
+  - text: ORDER
+  - text: EXPIRED
+  - text: BUY_VOUCHER          
