@@ -1,0 +1,157 @@
+<template>
+  <div class="container-fluid">
+    
+    <div style="margin-bottom:20px; margin-top:20px">
+      <!-- Button New -->
+      <b-button variant="success" size="sm" @click="openInput()" >Input {{PascalCase .Name}}</b-button>
+      
+      <b-button variant="info" style="margin-left:10px" size="sm" @click="queryItems">Refresh</b-button>
+
+      <!-- paging -->
+      <div class="float-right">
+        <b-pagination size="sm" @input="onPaging" v-model="paging.page" :total-rows="totalItems" :per-page="paging.size"></b-pagination>
+      </div>
+    </div>
+
+    <b-table small striped hover
+      :items="items" :fields="fields" 
+      :sort-by.sync="sorting.sortBy" 
+      :sort-desc.sync="sorting.sortDesc" 
+      :no-local-sorting="true" 
+      @sort-changed="onSorting" >
+      
+      <template v-slot:head(action)="">
+        <b-button variant="warning" @click="resetSorting" size="sm">Reset Sorting</b-button>
+      </template>
+
+      <template v-slot:head(index)="">
+        #
+      </template>
+
+      <template v-slot:cell(index)="data">
+        {{"{{"}} data.index + 1 {{"}}"}}
+      </template>
+
+      <template slot="top-row" slot-scope="{ fields }">
+        <td v-for="field in fields" :key="field.key">
+          <b-button variant="warning" @click="resetFiltering" v-if="field.key === 'action'" size="sm">Reset Filtering</b-button>
+          <b-form-input trim size="sm" autocomplete="off" :placeholder="field.label"
+            v-if="field.filterable"
+            v-model="filtering['f_' + field.key]"
+            @input="onFiltering" />
+        </td>
+      </template> 
+
+      <template v-slot:cell(action)="data">
+        <b-button-group>
+          <b-button @click="openInput(data.item)" size="sm" variant="primary">Edit</b-button>
+          <b-button @click="deleteItem(data.item)" size="sm" variant="danger">Delete</b-button>
+        </b-button-group>
+      </template>
+
+    </b-table>
+    <modal-input></modal-input>
+  </div>
+</template>
+
+<script>
+
+import { computed } from '@vue/composition-api';
+import ModalInput from "./input";
+import Swal from 'sweetalert2'
+
+export default {
+  components: {
+    ModalInput,
+  },
+  setup (_, {root}) {
+
+    const fields = [
+      'index',
+      'action', {{range .Fields}}
+      {key: '{{CamelCase .Name}}', sortable: true, filterable: true}, {{end}}
+    ]
+
+    const entity = '{{CamelCase .Name}}'
+
+    const paging = computed(() => root.$store.getters[`${entity}/getPaging`])
+
+    const sorting = computed(() => root.$store.getters[`${entity}/getSorting`])
+
+    const filtering = computed(() => root.$store.getters[`${entity}/getFiltering`])
+
+    const items = computed(() => root.$store.getters[`${entity}/getItems`])
+
+    const totalItems = computed(() => root.$store.getters[`${entity}/getTotalItems`])
+
+    const resetFiltering = () => root.$store.dispatch(`${entity}/resetFiltering`)
+
+    const resetSorting = () => root.$store.dispatch(`${entity}/resetSorting`)
+
+    const onFiltering = () => root.$store.dispatch(`${entity}/onFiltering`)
+
+    const onSorting = () => root.$store.dispatch(`${entity}/onSorting`)
+
+    const onPaging = () => root.$store.dispatch(`${entity}/onPaging`)
+
+    const queryItems = () => root.$store.dispatch(`${entity}/queryItems`)
+
+    const openInput = (item) => {
+
+      if (item === undefined) {
+        root.$bvModal.show('modalInput')
+        return
+      }
+
+      root.$store.dispatch(`${entity}/getOneItem`, { itemId: item.id }).then(() => {
+        root.$bvModal.show('modalInput')
+      })
+
+    }
+
+    const deleteConfirmObject = {
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, delete it!'
+    }
+
+    const deleteItem = (item) => {
+      Swal.fire(deleteConfirmObject).then((result) => {
+        if (result.value) {
+          root.$store.dispatch(`${entity}/deleteItem`, { itemId: item.id }).then(response => {
+            Swal.fire('Deleted!', `${response.data.message}`, 'success')
+          })
+        }
+      })
+    }
+
+    queryItems()
+
+    return {
+      items,
+      totalItems,
+      filtering,
+      sorting,
+      paging,
+      fields,
+      openInput,
+      queryItems,
+      deleteItem,
+      resetFiltering,
+      resetSorting,
+      onFiltering,
+      onSorting,
+      onPaging,
+    }
+  }
+}
+
+</script>
+
+<style>
+
+</style>

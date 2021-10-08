@@ -1,0 +1,53 @@
+package repository
+
+import (
+	"github.com/jinzhu/gorm"
+	
+	"{{PackagePath}}/model"
+)
+
+// SystemUserRepository is
+type SystemUserRepository interface {
+	Create(db interface{}, obj *model.SystemUser) error
+	GetByEmail(db interface{}, email string) *model.SystemUser
+	GetOne(db interface{}, ID string) *model.SystemUser
+}
+
+// systemUserRepository is
+type systemUserRepository struct{}
+
+// NewSystemUserRepository is
+func NewSystemUserRepository(db *gorm.DB) SystemUserRepository {
+	db.AutoMigrate(&model.SystemUser{})
+	return &systemUserRepository{}
+}
+
+// Create is
+func (u *systemUserRepository) Create(db interface{}, obj *model.SystemUser) error {
+	return db.(*gorm.DB).Create(obj).Error
+}
+
+// GetByEmail is
+func (u *systemUserRepository) GetByEmail(db interface{}, email string) *model.SystemUser {
+	var obj model.SystemUser
+	db.(*gorm.DB).First(&obj, "email = ?", email)
+	if obj.ID == "" {
+		return nil
+	}
+	return &obj
+
+}
+
+// GetOne is
+func (u *systemUserRepository) GetOne(db interface{}, ID string) *model.SystemUser {
+	var obj model.SystemUser
+
+	query := db.(*gorm.DB)
+
+	query.First(&obj, "id = ?", ID)
+
+	if obj.ID == "" {
+		return nil
+	}
+	return &obj
+}

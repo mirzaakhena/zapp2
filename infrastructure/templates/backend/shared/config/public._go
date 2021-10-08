@@ -1,0 +1,6 @@
+package config
+
+// NewDefaultConfig is
+func NewDefaultConfig(configName, path string) Config {
+	return initConfig(configName, path)
+}

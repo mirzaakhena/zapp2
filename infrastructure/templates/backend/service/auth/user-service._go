@@ -1,0 +1,130 @@
+package auth
+
+import (
+	"fmt"
+
+	"{{PackagePath}}/model"
+	"{{PackagePath}}/repository"
+	"{{PackagePath}}/shared/utils"
+	"{{PackagePath}}/shared/log"
+	"{{PackagePath}}/shared/token"
+	"{{PackagePath}}/shared/transaction"
+)
+
+// ISystemUserService is
+type ISystemUserService interface {
+	Login(dto model.LoginSystemUserRequest) (string, error)
+	ValidateLoginToken(token string) interface{}
+	Register(dto model.RegisterSystemUserRequest) error
+	HasAccess(extendData map[string]interface{}, accessName string) bool
+}
+
+// GetSystemUserID is
+func GetSystemUserID(ctx map[string]interface{}) string {
+
+	userIDIntf, okHaveSystemUserID := ctx["userID"]
+	if !okHaveSystemUserID {
+		log.Fatal("Does not have userID")
+	}
+
+	userID, okCast2 := userIDIntf.(string)
+	if !okCast2 {
+		log.Fatal("userID cannot cast to string")
+	}
+
+	return userID
+}
+
+// SystemUserService is
+type SystemUserService struct {
+	trx            transaction.Transaction
+	jwt            token.JwtToken
+	SystemUserRepository repository.SystemUserRepository
+}
+
+// NewSystemUserService is
+func NewSystemUserService(trx transaction.Transaction, jwt token.JwtToken, SystemUserRepository repository.SystemUserRepository) *SystemUserService {
+	return &SystemUserService{
+		trx:            trx,
+		jwt:            jwt,
+		SystemUserRepository: SystemUserRepository,
+	}
+}
+
+// Login is
+func (u *SystemUserService) Login(dto model.LoginSystemUserRequest) (string, error) {
+
+	existingSystemUser := u.SystemUserRepository.GetByEmail(u.trx.GetDB(false), dto.Email)
+	if existingSystemUser == nil {
+		return "", fmt.Errorf("SystemUser not exist or wrong password 1")
+	}
+
+	if !utils.IsValidPassword(dto.Password, existingSystemUser.Password) {
+		return "", fmt.Errorf("SystemUser not exist or wrong password %v != %v", dto.Password, existingSystemUser.Password)
+	}
+
+	extendData := map[string]interface{}{
+		"userID": existingSystemUser.ID,
+		"role":   existingSystemUser.Role,
+		"name":   existingSystemUser.Name,
+	}
+
+	token := u.jwt.GenerateToken("LOGIN", extendData, 24)
+
+	return token, nil
+}
+
+// ValidateLoginToken is
+func (u *SystemUserService) ValidateLoginToken(loginToken string) interface{} {
+
+	jwtObject := u.jwt.ValidateToken("LOGIN", loginToken)
+	if jwtObject == nil {
+		return nil
+	}
+
+	return jwtObject
+}
+
+// Register is
+func (u *SystemUserService) Register(dto model.RegisterSystemUserRequest) error {
+
+	trx := u.trx.GetDB(true)
+	defer u.trx.RollbackOnException(trx)
+
+	if existingSystemUser := u.SystemUserRepository.GetByEmail(trx, dto.Email); existingSystemUser != nil {
+		u.trx.Rollback(trx)
+		return fmt.Errorf("Email %v already exist", dto.Email)
+	}
+
+	var obj model.SystemUser
+
+	obj.ID = utils.GetUUID()
+	obj.Name = dto.Name
+	obj.Email = dto.Email
+	obj.Password = utils.GenerateHashPassword(dto.Password)
+	obj.Role = "USER"	
+	u.SystemUserRepository.Create(trx, &obj)
+
+	u.trx.Commit(trx)
+
+	return nil
+}
+
+// HasAccess is
+func (u *SystemUserService) HasAccess(extendData map[string]interface{}, accessName string) bool {
+
+	// if userID == "df9d6646-513d-47d6-a9a0-600a321f5f0b" && accessName == "OUTLET" {
+	// 	return true
+	// }
+
+	// if userID == "f759b3d7-f730-400c-8877-e86c3168f8ea" && accessName == "MENUGROUP" {
+	// 	return true
+	// }
+
+	// if userID == "0bd8fe85-f822-48ce-a3e4-1f0d39c40880" && accessName == "MENUITEM" {
+	// 	return true
+	// }
+
+	return true
+
+}

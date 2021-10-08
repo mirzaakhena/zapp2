@@ -1,0 +1,142 @@
+package crud
+
+import (
+	"fmt"
+
+	"{{PackagePath}}/model" {{if (.HasEnum)}}
+	"{{PackagePath}}/model/enum" {{end}}
+	"{{PackagePath}}/repository"
+	"{{PackagePath}}/shared/utils"
+	"{{PackagePath}}/shared/transaction"
+)
+
+// I{{PascalCase .Name}}Service is
+type I{{PascalCase .Name}}Service interface {
+	Create(obj model.Create{{PascalCase .Name}}Request) (string, error)
+	GetOne(ID string) *model.{{PascalCase .Name}}
+	GetAll(req model.GetAllCommonRequest) model.GetAllCommonResponse
+	Delete(ID string) error
+	Update(ID string, obj model.Update{{PascalCase .Name}}Request) error
+}
+
+// {{PascalCase .Name}}Service is
+type {{PascalCase .Name}}Service struct {
+	Trx transaction.Transaction	
+	{{PascalCase .Name}}Repository repository.{{PascalCase .Name}}Repository {{range UniqueFields .Fields .Name}} {{if (eq .DataType "entity")}}
+	{{PascalCase .EntityReference}}Repository repository.{{PascalCase .EntityReference}}Repository {{end}} {{end}}
+}
+
+// Create is
+func (g *{{PascalCase .Name}}Service) Create(dto model.Create{{PascalCase .Name}}Request) (string, error) {
+
+	trx := g.Trx.GetDB(true)
+	defer g.Trx.RollbackOnException(trx)
+
+	var obj model.{{PascalCase .Name}}
+
+	{{range .Fields}} {{if (eq .DataType "entity")}}
+	{
+		refObject := g.{{PascalCase .EntityReference}}Repository.GetOne(trx, dto.{{PascalCase .Name}}ObjID)
+		if refObject == nil {
+			g.Trx.Rollback(trx)
+			return "", fmt.Errorf("obj with id %v not found", dto.{{PascalCase .Name}}ObjID)
+		}
+		obj.{{PascalCase .Name}}ObjID = refObject.ID
+		obj.{{PascalCase .Name}} = refObject.{{PascalCase .EntityField}}
+	} {{else if (eq .DataType "enum")}}
+	{
+		if !enum.{{.EnumReference}}Exist(dto.{{.Name}}) {
+			return "", fmt.Errorf("{{.Name}} %s is not valid", dto.{{.Name}})
+		}
+		obj.{{PascalCase .Name}} = dto.{{PascalCase .Name}}
+	} {{else}}
+	obj.{{PascalCase .Name}} = dto.{{PascalCase .Name}} {{end}} {{end}} 
+	obj.ID = utils.GetUUID() 
+
+	g.{{PascalCase .Name}}Repository.Create(trx, &obj)
+
+	g.Trx.Commit(trx)
+
+	return obj.ID, nil
+}
+
+// GetOne is
+func (g *{{PascalCase .Name}}Service) GetOne(ID string) *model.{{PascalCase .Name}} {
+	return g.{{PascalCase .Name}}Repository.GetOne(g.Trx.GetDB(false), ID)
+}
+
+// GetAll is
+func (g *{{PascalCase .Name}}Service) GetAll(req model.GetAllCommonRequest) model.GetAllCommonResponse {
+
+	r, c := g.{{PascalCase .Name}}Repository.GetAll(g.Trx.GetDB(false), req.Page, req.Size, req.SortBy, req.SortDesc, req.Filters)
+
+	if c == 0 {
+		return model.GetAllCommonResponse{
+			TotalCount: 0,
+			Items:      []interface{}{},
+		}
+	}
+
+	return model.GetAllCommonResponse{
+		TotalCount: c,
+		Items:      r,
+	}
+
+}
+
+// Delete is
+func (g *{{PascalCase .Name}}Service) Delete(ID string) error {
+
+	trx := g.Trx.GetDB(true)
+	defer g.Trx.RollbackOnException(trx)
+
+	obj := g.{{PascalCase .Name}}Repository.GetOne(trx, ID)
+	if obj == nil {
+		g.Trx.Rollback(trx)
+		return fmt.Errorf("obj with id %v not found", ID)
+	}
+
+	if err := g.{{PascalCase .Name}}Repository.Delete(trx, ID); err != nil {
+		g.Trx.Rollback(trx)
+		return err
+	}
+
+	g.Trx.Commit(trx)
+
+	return nil
+
+}
+
+// Update is
+func (g *{{PascalCase .Name}}Service) Update(ID string, dto model.Update{{PascalCase .Name}}Request) error {
+
+	trx := g.Trx.GetDB(true)
+	defer g.Trx.RollbackOnException(trx)
+
+	obj := g.{{PascalCase .Name}}Repository.GetOne(trx, ID)
+	if obj == nil {
+		g.Trx.Rollback(trx)
+		return fmt.Errorf("obj with id %v not found", ID)
+	}
+
+	{{range .Fields}} {{if (eq .DataType "entity")}}
+	{
+		refObject := g.{{PascalCase .EntityReference}}Repository.GetOne(trx, dto.{{PascalCase .Name}}ObjID)
+		if refObject == nil {
+			g.Trx.Rollback(trx)
+			return fmt.Errorf("obj with id %v not found", dto.{{PascalCase .Name}}ObjID)
+		}
+		obj.{{PascalCase .Name}}ObjID = refObject.ID
+		obj.{{PascalCase .Name}} = refObject.{{PascalCase .EntityField}}
+	} {{else}}
+	obj.{{.Name}} = dto.{{.Name}} {{end}} {{end}} 
+
+	if err := g.{{PascalCase .Name}}Repository.Update(trx, obj); err != nil {
+		g.Trx.Rollback(trx)
+		return err
+	}
+
+	g.Trx.Commit(trx)
+
+	return nil
+}

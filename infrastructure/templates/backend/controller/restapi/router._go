@@ -1,0 +1,69 @@
+package restapi
+
+import (
+	"fmt"
+	"net/http"
+	"time"
+
+	"{{PackagePath}}/shared/utils"
+	"{{PackagePath}}/shared/config"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+)
+
+// RouterConfig is
+type RouterConfig struct {
+	Config                config.Config
+	Router                *gin.Engine
+	SystemUserRestAPI  *SystemUserRestAPI	{{range .Entities}}
+	{{PascalCase .Name}}RestAPI *{{PascalCase .Name}}RestAPI {{end}}
+}
+
+// CreateServiceContext is
+func CreateServiceContext(c *gin.Context) map[string]interface{} {
+	sc := map[string]interface{}{
+		"ip":        c.ClientIP(),
+		"session":   utils.GetUUID(),
+		"source":    "API",
+		"methodURL": fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path),
+	}
+	return sc
+}
+
+// Setup is
+func (r *RouterConfig) Setup() {
+
+	r.Router.Use(cors.New(cors.Config{
+		ExposeHeaders:   []string{"Data-Length"},
+		AllowMethods:    []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"},
+		AllowAllOrigins: true,
+		AllowHeaders:    []string{"Content-Type", "Authorization"},
+		MaxAge:          12 * time.Hour,
+	}))
+
+	htmlPathDist := r.Config.GetString("html.dist_path", "")
+
+	r.Router.StaticFile("./favicon.ico", fmt.Sprintf("%s/favicon.ico", htmlPathDist))
+	r.Router.Static("/static", fmt.Sprintf("%s/static", htmlPathDist))
+	r.Router.LoadHTMLGlob(fmt.Sprintf("%s/index.html", htmlPathDist))
+
+	r.Router.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", gin.H{"title": "MainMenu"})
+	})
+
+	r.Router.Handle("POST", "/register", r.SystemUserRestAPI.Register)
+	r.Router.Handle("POST", "/login", r.SystemUserRestAPI.Login)
+
+	apiGroup := r.Router.Group("/api", r.SystemUserRestAPI.ValidateToken)
+
+  {{range .Entities}}
+  // {{PascalCase .Name}}
+  {
+    apiGroup.Handle("POST", "/{{CamelCase .Name}}", r.SystemUserRestAPI.EnforceAccessControl("{{UpperCase .Name}}"), r.{{PascalCase .Name}}RestAPI.Create)
+    apiGroup.Handle("GET", "/{{CamelCase .Name}}", r.SystemUserRestAPI.EnforceAccessControl("{{UpperCase .Name}}"), r.{{PascalCase .Name}}RestAPI.GetAll)
+    apiGroup.Handle("GET", "/{{CamelCase .Name}}/:{{CamelCase .Name}}ID", r.SystemUserRestAPI.EnforceAccessControl("{{UpperCase .Name}}"), r.{{PascalCase .Name}}RestAPI.GetOne)
+    apiGroup.Handle("DELETE", "/{{CamelCase .Name}}/:{{CamelCase .Name}}ID", r.SystemUserRestAPI.EnforceAccessControl("{{UpperCase .Name}}"), r.{{PascalCase .Name}}RestAPI.Delete)
+    apiGroup.Handle("PUT", "/{{CamelCase .Name}}/:{{CamelCase .Name}}ID", r.SystemUserRestAPI.EnforceAccessControl("{{UpperCase .Name}}"), r.{{PascalCase .Name}}RestAPI.Update)
+  } {{end}}
+
+}

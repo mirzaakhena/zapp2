@@ -1,0 +1,80 @@
+package main
+
+import (
+	"fmt"
+
+	"github.com/gin-gonic/autotls"	
+	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/gorm"	
+	_ "github.com/jinzhu/gorm/dialects/mysql"  //
+	_ "github.com/jinzhu/gorm/dialects/sqlite" //
+
+	controller "{{PackagePath}}/controller/restapi"
+	"{{PackagePath}}/repository"
+	"{{PackagePath}}/service/auth"
+	"{{PackagePath}}/service/crud"
+	"{{PackagePath}}/shared/config"
+	"{{PackagePath}}/shared/log"
+	"{{PackagePath}}/shared/token"
+	"{{PackagePath}}/shared/transaction"
+)
+
+func main() {
+
+	cf := config.NewDefaultConfig("config", ".")
+
+	log.UseRotateFile(cf.GetString("log.path", "."), cf.GetString("application.name", "{{AppName}}"), cf.GetInt("log.max_age", 14))
+
+	log.Info("Apps is start running")
+
+	db, err := gorm.Open(cf.GetString("database.dialect", "sqlite3"), cf.GetString("database.connection_string", "database.db"))
+	if err != nil {
+		panic(err)
+	}
+	db.LogMode(cf.GetBool("database.log", false))
+
+	// {
+	// 	f, err := os.OpenFile("sql.debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	// 	if err != nil {
+	// 		log.Fatal("Error opening file %v", err.Error())
+	// 	}
+	// 	db.SetLogger(defaultLog.New(f, "[SQL] ", 0))
+	// 	gin.DefaultWriter = f
+	// }
+
+	ginRouter := gin.Default()
+
+	trx := transaction.NewTransactionDB(db)
+
+	systemUserRepository := repository.NewSystemUserRepository(db) {{range .Entities}}
+	{{CamelCase .Name}}Repository := repository.New{{PascalCase .Name}}Repository(db) {{end}}
+
+	secretKey := []byte(cf.GetString("apps.secret_key", ""))
+	jwt := token.GetJWTToken(secretKey)
+	systemUserService := auth.NewSystemUserService(trx, jwt, systemUserRepository) {{range .Entities}}
+
+	{{CamelCase .Name}}Service := &crud.{{PascalCase .Name}}Service{
+		Trx: trx,
+		{{PascalCase .Name}}Repository: {{CamelCase .Name}}Repository, {{range UniqueFields .Fields .Name}} {{if (eq .DataType "entity")}}
+		{{PascalCase .EntityReference}}Repository: {{CamelCase .EntityReference}}Repository, {{end}} {{end}}
+	} {{end}}
+
+	rc := controller.RouterConfig{
+		Config: cf,
+		Router: ginRouter, 
+		SystemUserRestAPI: controller.NewSystemUserRestAPI(systemUserService),	{{range .Entities}}
+		{{PascalCase .Name}}RestAPI: controller.New{{PascalCase .Name}}RestAPI({{CamelCase .Name}}Service), {{end}}
+	}
+
+	rc.Setup()	
+
+	if gin.Mode() == gin.ReleaseMode {
+		if err := autotls.Run(ginRouter, cf.GetString("server.domain", "{{AppName}}.com")); err != nil {
+			log.Fatal("Error on TLS %v", err.Error())
+		}
+
+	} else {
+		ginRouter.Run(fmt.Sprintf(":%d", cf.GetInt("server.port", 8081)))
+	}
+	
+}

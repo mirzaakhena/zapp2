@@ -1,0 +1,31 @@
+package model
+
+// SystemUser is
+type SystemUser struct {
+	BaseModel
+	Name     string `` //
+	Email    string `` //
+	Password string `` //
+	Role     string `` //
+}
+
+// SystemUserResponse is
+type SystemUserResponse struct {
+	ID    string `json:"id"`    //
+	Name  string `json:"name"`  //
+	Email string `json:"email"` //
+	Role  string `json:"role"`  //
+}
+
+// RegisterSystemUserRequest is
+type RegisterSystemUserRequest struct {
+	Name     string `json:"name" validate:"required"`     //
+	Email    string `json:"email" validate:"required"`    //
+	Password string `json:"password" validate:"required"` //
+}
+
+// LoginSystemUserRequest is
+type LoginSystemUserRequest struct {
+	Email    string `json:"email" validate:"required"`    //
+	Password string `json:"password" validate:"required"` //
+}

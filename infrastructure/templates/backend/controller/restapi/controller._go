@@ -1,0 +1,192 @@
+package restapi
+
+import (
+	"fmt"
+	"net/http"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator"
+	service "{{PackagePath}}/service/crud"
+	"{{PackagePath}}/model"
+	"{{PackagePath}}/shared/utils"
+	"{{PackagePath}}/shared/log"
+)
+
+// {{PascalCase .Name}}RestAPI is
+type {{PascalCase .Name}}RestAPI struct {
+	{{CamelCase .Name}}Service service.I{{PascalCase .Name}}Service
+}
+
+// New{{PascalCase .Name}}RestAPI is
+func New{{PascalCase .Name}}RestAPI({{CamelCase .Name}}Service service.I{{PascalCase .Name}}Service) *{{PascalCase .Name}}RestAPI {
+
+	c := {{PascalCase .Name}}RestAPI{
+		{{CamelCase .Name}}Service: {{CamelCase .Name}}Service,
+	}
+
+	return &c
+}
+
+// Create is
+func (g *{{PascalCase .Name}}RestAPI) Create(c *gin.Context) {
+
+	sc := CreateServiceContext(c)
+	sc["userID"] = GetSystemUserID(c)
+
+	var dto model.Create{{PascalCase .Name}}Request
+	if err := c.BindJSON(&dto); err != nil {
+		log.Error("%v", err.Error())
+		c.JSON(http.StatusBadRequest, map[string]interface{}{"message": "Invalid Params. Please check data structure and type"})
+		return
+	}
+
+	if err := validator.New().Struct(dto); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]interface{}{"message": err.Error()})
+		return
+	}	
+
+	log.Info("REQUEST data %v", utils.GetJSON(dto))
+
+	objID, err := g.{{CamelCase .Name}}Service.Create(dto)
+	if err != nil {
+		message := log.Error("RESPONSE %v", err.Error())
+		c.JSON(http.StatusBadRequest, map[string]interface{}{"message": message})
+		return
+	}
+
+	message := log.Info("RESPONSE %v success created", objID)
+	c.JSON(http.StatusCreated, map[string]interface{}{"message": message})
+}
+
+// GetOne is
+func (g *{{PascalCase .Name}}RestAPI) GetOne(c *gin.Context) {
+
+	sc := CreateServiceContext(c)
+	sc["userID"] = GetSystemUserID(c)
+
+	id := c.Param("{{CamelCase .Name}}ID")
+
+	log.Info("REQUEST %v", id)
+
+	obj := g.{{CamelCase .Name}}Service.GetOne(id)
+	if obj == nil {
+		message := log.Info("RESPONSE ID %v not found", id)
+		c.JSON(http.StatusOK, map[string]interface{}{"message": message})
+		return
+	}
+
+	message := log.Info("RESPONSE %v found", id)
+	c.JSON(http.StatusOK, map[string]interface{}{"message": message, "data": obj})
+}
+
+// GetAll is
+func (g *{{PascalCase .Name}}RestAPI) GetAll(c *gin.Context) {
+
+	sc := CreateServiceContext(c)
+	sc["userID"] = GetSystemUserID(c)
+
+	pageStr := c.DefaultQuery("page", "1")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	sizeStr := c.DefaultQuery("size", "30")
+	size, err := strconv.Atoi(sizeStr)
+	if err != nil || (size < 1 && size > 100) {
+		size = 1
+	}
+
+	sortBy := c.DefaultQuery("sortBy", "")
+	sortDescString := c.DefaultQuery("sortDesc", "false")
+
+	sortDesc, err := strconv.ParseBool(sortDescString)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, map[string]interface{}{"message": "sortDesc must bool", "data": []interface{}{}})		
+		return
+	}
+
+	filters := map[string]string{}
+
+	listField := []string{ {{range .Fields}}
+		"{{CamelCase .Name}}",{{end}}
+	}
+
+	for _, field := range listField {
+		if query := c.DefaultQuery("f_"+field, ""); query != "" {
+			filters[field] = query
+		}
+	}
+
+	log.Info("REQUEST page %v, size %v, filter %v", page, size, utils.GetJSON(filters))
+
+	req := model.GetAllCommonRequest{
+		Filters:  filters,
+		Page:     page,
+		Size:     size,
+		SortBy:   sortBy,
+		SortDesc: sortDesc,
+	}
+
+	objs := g.{{CamelCase .Name}}Service.GetAll(req)
+
+	message := log.Info("RESPONSE found %v objects", objs.TotalCount)
+	c.JSON(http.StatusOK, map[string]interface{}{"message": message, "data": objs})
+}
+
+// Update is
+func (g *{{PascalCase .Name}}RestAPI) Update(c *gin.Context) {
+
+	sc := CreateServiceContext(c)
+	sc["userID"] = GetSystemUserID(c)
+
+	id := c.Param("{{CamelCase .Name}}ID")
+
+	var dto model.Update{{PascalCase .Name}}Request
+	if err := c.BindJSON(&dto); err != nil {
+		log.Error("%v", err.Error())
+		c.JSON(http.StatusBadRequest, map[string]interface{}{"message": fmt.Sprintf("Invalid Params. Please check data structure and type")})
+		return
+	}
+
+	if err := validator.New().Struct(dto); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]interface{}{"message": err.Error()})
+		return
+	}	
+
+	log.Info("REQUEST ID %v, data %v", id, utils.GetJSON(dto))
+
+	err := g.{{CamelCase .Name}}Service.Update(id, dto)
+	if err != nil {
+		message := log.Error("RESPONSE %v", err.Error())
+		c.JSON(http.StatusBadRequest, map[string]interface{}{"message": message})
+		return
+	}
+
+	message := log.Info("RESPONSE ID %v success updated", id)
+	c.JSON(http.StatusOK, map[string]interface{}{"message": message})
+
+}
+
+// Delete is
+func (g *{{PascalCase .Name}}RestAPI) Delete(c *gin.Context) {
+
+	sc := CreateServiceContext(c)
+	sc["userID"] = GetSystemUserID(c)
+
+	id := c.Param("{{CamelCase .Name}}ID")
+
+	log.Info("REQUEST ID %v", id)
+
+	err := g.{{CamelCase .Name}}Service.Delete(id)
+	if err != nil {
+		log.Error("RESPONSE %v", err.Error())
+		c.JSON(http.StatusBadRequest, map[string]interface{}{"message": fmt.Sprintf("Error when delete record with ID %v", id)})
+		return
+	}
+
+	message := log.Info("RESPONSE ID %v success deleted", id)
+	c.JSON(http.StatusOK, map[string]interface{}{"message": message})
+
+}

@@ -1,0 +1,159 @@
+<template>
+  <b-modal ref="modalInput" id="modalInput" title="Input {{PascalCase .Name}}" @ok="onSubmit" @shown="onShown" @hidden="onHidden">{{range .Fields}}{{if (eq .DataType "string")}}
+
+    <b-form-group label="{{PascalCase .Name}}">
+      <b-form-input type="text" v-model="state.inputedItem.{{CamelCase .Name}}" required autocomplete="off"></b-form-input>
+    </b-form-group>{{else if (eq .DataType "int")}}
+
+    <b-form-group label="{{PascalCase .Name}}">
+      <b-form-input v-model.number="state.inputedItem.{{CamelCase .Name}}" type="number" required autocomplete="off"></b-form-input>
+    </b-form-group>{{else if (eq .DataType "uint")}}
+
+    <b-form-group label="{{PascalCase .Name}}">
+      <b-form-input v-model.number="state.inputedItem.{{CamelCase .Name}}" type="number" required autocomplete="off"></b-form-input>
+    </b-form-group>{{else if (eq .DataType "float64")}}
+
+    <b-form-group label="{{PascalCase .Name}}">
+      <b-form-input v-model.number="state.inputedItem.{{CamelCase .Name}}" type="number" required autocomplete="off"></b-form-input>
+    </b-form-group>{{else if (eq .DataType "bool")}}
+
+    <b-form-group label="{{PascalCase .Name}}">
+      <b-form-checkbox v-model="state.inputedItem.{{CamelCase .Name}}"></b-form-checkbox>
+    </b-form-group>{{else if (eq .DataType "time.Time")}}
+
+    <b-form-group label="{{PascalCase .Name}}">      
+      <b-form-input type="text" v-model="state.inputedItem.{{CamelCase .Name}}" required autocomplete="off"></b-form-input>
+    </b-form-group>{{else if (eq .DataType "enum")}}
+
+    <b-form-group label="{{PascalCase .Name}}">
+      <b-form-select v-model="state.inputedItem.{{CamelCase .Name}}" :options="options{{PascalCase .Name}}" />
+    </b-form-group>{{else if (eq .DataType "entity")}}
+
+    <b-form-group label="{{PascalCase .Name}}">    
+      <autocomplete 
+        ref="autocomplete{{PascalCase .Name}}Model"
+        :search="autocomplete{{PascalCase .Name}}.search" 
+        :get-result-value="autocomplete{{PascalCase .Name}}.getResultValue"
+        @submit="autocomplete{{PascalCase .Name}}.submit"/>
+    </b-form-group>{{end}}{{end}}
+
+  </b-modal>
+
+</template>
+
+<script>
+
+import { reactive } from '@vue/composition-api'
+{{if (.HasAutocomplete)}}
+import Autocomplete from '@trevoreyre/autocomplete-vue'
+import to from 'await-to-js';
+import request from "@/utils/httprequest";
+{{end}}
+
+export default {
+  {{if (.HasAutocomplete)}}
+  components: {
+    Autocomplete,
+  },  
+  {{end}}
+  setup(_, {refs, root}) {
+
+    const entity = '{{CamelCase .Name}}'
+
+    const initialObject = () => {
+      return { {{range UniqueFields .Fields ""}} {{if (eq .DataType "entity")}}
+        {{CamelCase .Name}}ObjID: '',{{else if (eq .DataType "string")}}
+        {{CamelCase .Name}}: '{{.DefaultValue}}',{{else if (eq .DataType "enum")}}
+        {{CamelCase .Name}}: '{{.DefaultValue}}',{{else if (eq .DataType "uint")}}
+        {{CamelCase .Name}}: 0,{{else if (eq .DataType "int")}}
+        {{CamelCase .Name}}: 0,{{else if (eq .DataType "float64")}}
+        {{CamelCase .Name}}: 0.0,{{else if (eq .DataType "bool")}}
+        {{CamelCase .Name}}: false,{{else if (eq .DataType "time.Time")}}
+        {{CamelCase .Name}}: '2019-06-07T05:43:21Z', {{end}} {{end}}
+      }
+    }
+
+    const state = reactive({
+      inputedItem: initialObject()
+    })
+
+    const onSubmit = async (bvModalEvt) => {
+      
+      bvModalEvt.preventDefault()
+
+      if (root.$store.getters[`${entity}/getInputedItem`]) {
+        root.$store.dispatch(`${entity}/updateItem`).then(() => {
+          refs.modalInput.hide()
+        })
+        return
+      } 
+
+      root.$store.dispatch(`${entity}/createItem`, {inputedItem: state.inputedItem}).then(() => {
+        refs.modalInput.hide()
+      })
+
+    }
+
+    const onShown = () => {
+      let inputedItem = root.$store.getters[`${entity}/getInputedItem`]
+      if (inputedItem !== null) {
+        state.inputedItem = inputedItem
+      }
+      {{range .Fields}}{{if (eq .DataType "entity")}}
+      refs.autocomplete{{PascalCase .Name}}Model.setValue(state.inputedItem.{{CamelCase .Name}}Obj){{end}}{{end}}
+    }
+
+    const onHidden = () => {
+      state.inputedItem = initialObject()
+    }
+    {{range .Fields}}{{if (eq .DataType "enum")}}
+    const options{{PascalCase .Name}} = [ {{range .EnumValues}}
+      { value: '{{.Value}}', text: '{{.Text}}' }, {{end}}
+    ]{{end}}{{end}} 
+    {{range .Fields}}{{if (eq .DataType "entity")}}
+    const autocomplete{{PascalCase .Name}} = {
+
+      async search (searchInput) {
+
+        const [error, response] = await to(request({
+          method: 'get',
+          url: '/api/{{CamelCase .EntityReference}}',
+          params: {
+            page: 1,
+            size: 10,
+            f_{{CamelCase .EntityField}}: `${searchInput}`,
+          }
+        }))
+        if (error) {
+          return 
+        }
+
+        return response.data.data.items
+
+      },
+
+      getResultValue (x) {
+        return `${x.{{CamelCase .EntityField}}}`
+      },
+
+      submit (result) {
+        state.inputedItem.{{CamelCase .Name}}ObjID = result.id
+      },
+    }
+    {{end}}{{end}}
+
+    return {
+      onSubmit, 
+      onShown, 
+      onHidden, 
+      state,{{range .Fields}}{{if (eq .DataType "enum")}}
+      options{{PascalCase .Name}},{{else if (eq .DataType "entity")}}
+      autocomplete{{PascalCase .Name}},{{end}}{{end}}
+    }
+  }
+}
+</script>
+
+<style>
+
+</style>
