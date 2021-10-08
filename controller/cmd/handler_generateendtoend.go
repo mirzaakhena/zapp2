@@ -4,7 +4,6 @@ import (
   "context"
   "fmt"
   "github.com/mirzaakhena/zapp2/infrastructure/log"
-  "github.com/mirzaakhena/zapp2/infrastructure/util"
   "github.com/mirzaakhena/zapp2/usecase/generateendtoend"
 )
 
@@ -26,8 +25,6 @@ func (r *Controller) generateEndToEndHandler(inputPort generateendtoend.Inport) 
 
     var req generateendtoend.InportRequest
     req.YamlFile = commands[0]
-
-    log.Info(ctx, util.MustJSON(req))
 
     _, err := inputPort.Execute(ctx, req)
     if err != nil {

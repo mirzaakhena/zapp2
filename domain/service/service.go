@@ -112,15 +112,18 @@ func RunProcess(file string) {
     createEnumFile(&tp, &en)
   }
 
-  fmt.Printf(">>>>> done Run\n")
-  //
-  //goFormat(tp.PackagePath)
-  //
-  //goGet()
+  fmt.Printf("generate code done\n")
+
+  goFormat(tp.PackagePath)
+
+  goGet()
+
+  npmInstall()
+
+  npmRunBuild()
 
 }
 
-// do go format
 func goFormat(path string) {
   fmt.Println("go fmt")
   cmd := exec.Command("go", "fmt", fmt.Sprintf("%s/...", path))
@@ -131,7 +134,29 @@ func goFormat(path string) {
   }
 }
 
-// call go get
+func npmInstall() {
+  fmt.Println("npm install")
+  cmd := exec.Command("npm", "install")
+  cmd.Dir = "./webapp/"
+  cmd.Stdout = os.Stdout
+  cmd.Stderr = os.Stderr
+  if err := cmd.Run(); err != nil {
+    log.Fatalf("cmd.Run() failed with %s\n", err)
+  }
+}
+
+func npmRunBuild() {
+  fmt.Println("npm install")
+  cmd := exec.Command("npm", "run", "build")
+  cmd.Dir = "./webapp/"
+  cmd.Stdout = os.Stdout
+  cmd.Stderr = os.Stderr
+  if err := cmd.Run(); err != nil {
+    log.Fatalf("cmd.Run() failed with %s\n", err)
+  }
+}
+
+
 func goGet() {
   fmt.Println("go get")
   cmd := exec.Command("go", "get", fmt.Sprintf("./..."))
